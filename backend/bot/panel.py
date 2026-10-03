@@ -34,11 +34,13 @@ async def home_content(telegram_user) -> tuple[str, bool]:
 
 
 async def send_panel(message: Message, text: str, markup, **kwargs):
-    """Drop the bottom reply keyboard, then pin the buttons under this message."""
-    sent = await message.answer(text, reply_markup=HIDE_REPLY_KEYBOARD, **kwargs)
-    if markup is not None:
-        await sent.edit_reply_markup(reply_markup=markup)
-    return sent
+    """Remove the old bottom keyboard, then send the text with its own buttons."""
+    try:
+        gone = await message.answer("\u2060", reply_markup=HIDE_REPLY_KEYBOARD)
+        await gone.delete()
+    except Exception:
+        pass
+    return await message.answer(text, reply_markup=markup, **kwargs)
 
 
 async def edit_panel(message: Message, text: str, markup) -> None:
