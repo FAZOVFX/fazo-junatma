@@ -1,9 +1,10 @@
 """Premium screen in the bot."""
 
 from aiogram import F, Router
-from aiogram.types import Message, User as TelegramUser
+from aiogram.types import CallbackQuery, Message, User as TelegramUser
 
 from backend.bot.keyboards import subscription_keyboard
+from backend.bot.panel import edit_panel, send_panel
 from backend.database.database import session_scope
 from backend.services.referral_service import register_user
 from backend.services.subscription_service import sync_subscription_status
@@ -36,4 +37,14 @@ async def subscription_message(telegram_user: TelegramUser) -> str:
 @router.message(F.text.in_({BTN_PREMIUM, "💎 Premium"}))
 async def show_premium(message: Message) -> None:
     text = await subscription_message(message.from_user)
-    await message.answer(text, reply_markup=subscription_keyboard())
+    await send_panel(message, text, subscription_keyboard())
+
+
+@router.callback_query(F.data == "menu:sub")
+async def menu_subscription(callback: CallbackQuery) -> None:
+    text = await subscription_message(callback.from_user)
+    await callback.answer()
+    try:
+        await edit_panel(callback.message, text, subscription_keyboard())
+    except Exception:
+        await send_panel(callback.message, text, subscription_keyboard())

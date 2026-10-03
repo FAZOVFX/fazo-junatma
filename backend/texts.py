@@ -65,7 +65,7 @@ def welcome_text(name: str, subscription_status: str, expires_at, now) -> str:
         "Bu bot istalgan hajmdagi faylni yuklab, sizga xavfsiz link beradi. "
         "Linkni yuborsangiz, qabul qiluvchi faylni Telegram ichida yuklab oladi.\n\n"
         f"🎁 {access_pill(subscription_status, expires_at, now)}\n\n"
-        "Boshlash uchun pastdagi tugmani bosing 👇"
+        "Boshlash uchun tugmani bosing 👇"
     )
 
 

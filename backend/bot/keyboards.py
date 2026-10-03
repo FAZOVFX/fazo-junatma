@@ -6,9 +6,8 @@ from aiogram.types import (
     CopyTextButton,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
     LinkPreviewOptions,
-    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     WebAppInfo,
 )
 
@@ -33,21 +32,27 @@ def _webapp(screen: str) -> str | None:
     return f"{base}/?screen={screen}"
 
 
-def main_menu(is_admin: bool) -> ReplyKeyboardMarkup:
+HIDE_REPLY_KEYBOARD = ReplyKeyboardRemove()
+
+
+def main_menu(is_admin: bool) -> InlineKeyboardMarkup:
     upload_url = _webapp("upload")
     upload_button = (
-        KeyboardButton(text=BTN_UPLOAD, web_app=WebAppInfo(url=upload_url))
+        InlineKeyboardButton(text=BTN_UPLOAD, web_app=WebAppInfo(url=upload_url))
         if upload_url
-        else KeyboardButton(text=BTN_UPLOAD)
+        else InlineKeyboardButton(text=BTN_UPLOAD, callback_data="menu:upload")
     )
     rows = [
         [upload_button],
-        [KeyboardButton(text=BTN_PREMIUM), KeyboardButton(text=BTN_REFERRAL)],
-        [KeyboardButton(text=BTN_BALANCE)],
+        [
+            InlineKeyboardButton(text=BTN_PREMIUM, callback_data="menu:sub"),
+            InlineKeyboardButton(text=BTN_REFERRAL, callback_data="menu:ref"),
+        ],
+        [InlineKeyboardButton(text=BTN_BALANCE, callback_data="menu:account")],
     ]
     if is_admin:
-        rows.append([KeyboardButton(text=BTN_ADMIN)])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+        rows.append([InlineKeyboardButton(text=BTN_ADMIN, callback_data="menu:admin")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def subscription_keyboard() -> InlineKeyboardMarkup:
@@ -114,6 +119,7 @@ def referral_keyboard(link: str) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="📤 Ulashish", url=share)],
             [InlineKeyboardButton(text="📋 Nusxa olish", copy_text=CopyTextButton(text=link))],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data="menu:home")],
         ]
     )
 
@@ -126,6 +132,7 @@ def admin_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📁 Storage", callback_data="adm:storage")],
             [InlineKeyboardButton(text="💰 Balans operatsiyalari", callback_data="adm:wallet")],
             [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data="menu:home")],
         ]
     )
 

@@ -10,6 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from backend.bot.keyboards import card_keyboard, main_menu, payment_amounts, payment_review, subscription_keyboard
+from backend.bot.panel import send_panel
 from backend.bot.subscriptions import subscription_message
 from backend.config import get_settings
 from backend.constants import PAYMENT_PREMIUM, PAYMENT_WALLET, PREMIUM_PRICE_UZS
@@ -71,7 +72,7 @@ async def payment_menu(message: Message) -> None:
         user = await _user(message.from_user, session)
         is_admin = _is_admin(user.telegram_id)
     await _show_card(message)
-    await message.answer("Asosiy menyu", reply_markup=main_menu(is_admin))
+    await send_panel(message, "Asosiy menyu", main_menu(is_admin))
 
 
 @router.message(F.text == "💰 Balans")
@@ -81,16 +82,19 @@ async def show_balance(message: Message) -> None:
         text = balance_text(user.balance_uzs)
         is_admin = _is_admin(user.telegram_id)
     await message.answer(text, reply_markup=payment_amounts())
-    await message.answer("Asosiy menyu", reply_markup=main_menu(is_admin))
+    await send_panel(message, "Asosiy menyu", main_menu(is_admin))
 
 
 @router.callback_query(F.data == "sub:back")
 async def subscription_back(callback: CallbackQuery) -> None:
+    from backend.bot.panel import edit_panel, home_content
+
+    text, is_admin = await home_content(callback.from_user)
     await callback.answer()
     try:
-        await callback.message.delete()
+        await edit_panel(callback.message, text, main_menu(is_admin))
     except Exception:
-        logger.info("could not delete subscription message")
+        logger.info("could not return to main menu")
 
 
 @router.callback_query(F.data == "sub:card")

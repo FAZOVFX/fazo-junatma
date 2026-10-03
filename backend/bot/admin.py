@@ -5,7 +5,8 @@ import logging
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
-from backend.bot.keyboards import admin_menu, main_menu, payment_review
+from backend.bot.keyboards import admin_menu, payment_review
+from backend.bot.panel import edit_panel, send_panel
 from backend.config import get_settings
 from backend.database.database import session_scope
 from backend.database.models import User
@@ -28,7 +29,19 @@ async def open_admin(message: Message) -> None:
     if not _is_admin(message.from_user.id):
         await message.answer("Admin huquqi yo‘q.")
         return
-    await message.answer("👑 Admin panel", reply_markup=admin_menu())
+    await send_panel(message, "👑 Admin panel", admin_menu())
+
+
+@router.callback_query(F.data == "menu:admin")
+async def menu_admin(callback: CallbackQuery) -> None:
+    if not _is_admin(callback.from_user.id):
+        await callback.answer("Admin huquqi yo‘q.", show_alert=True)
+        return
+    await callback.answer()
+    try:
+        await edit_panel(callback.message, "👑 Admin panel", admin_menu())
+    except Exception:
+        logger.info("could not open admin panel")
 
 
 def _storage_text(report: dict) -> str:
@@ -148,5 +161,3 @@ async def stats(callback: CallbackQuery) -> None:
 @router.message(F.text == "/admin")
 async def admin_command(message: Message) -> None:
     await open_admin(message)
-    if _is_admin(message.from_user.id):
-        await message.answer("Menyu", reply_markup=main_menu(True))
