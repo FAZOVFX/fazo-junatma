@@ -19,17 +19,21 @@ def format_uzs(amount: int) -> str:
     return f"{sign}{grouped} so\u2018m"
 
 
+def _trim_number(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
 def format_size(num_bytes: int) -> str:
     size = max(0, int(num_bytes))
     gib = 1024**3
     mib = 1024**2
     kib = 1024
     if size >= gib:
-        return f"{size / gib:.2f} GB"
+        return f"{_trim_number(size / gib)} GB"
     if size >= mib:
-        return f"{size / mib:.2f} MB"
+        return f"{_trim_number(size / mib)} MB"
     if size >= kib:
-        return f"{size / kib:.2f} KB"
+        return f"{_trim_number(size / kib)} KB"
     return f"{size} B"
 
 

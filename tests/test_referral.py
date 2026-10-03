@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 
 from backend.database.models import Referral
-from backend.services.referral_service import award_referral, referral_link, referral_stats, register_user
+from backend.services.referral_service import award_referral, parse_referral_payload, referral_link, referral_stats, register_user
 from backend.utils.formatting import as_utc
 
 NOW = datetime(2026, 3, 1, tzinfo=timezone.utc)
@@ -19,6 +19,11 @@ async def _user(session, telegram_id, code=None):
         referral_code=code,
         now=NOW,
     )
+
+
+def test_file_link_is_not_a_referral():
+    assert parse_referral_payload("f_abc123def456") is None
+    assert parse_referral_payload("ref_ab12cd34") == "ab12cd34"
 
 
 async def test_referral_adds_one_day(database):

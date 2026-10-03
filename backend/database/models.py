@@ -56,6 +56,7 @@ class File(Base):
     storage_folder_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    public_code: Mapped[str | None] = mapped_column(String(16), unique=True, nullable=True, index=True)
     download_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

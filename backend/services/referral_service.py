@@ -33,6 +33,8 @@ def parse_referral_payload(payload: str | None) -> str | None:
     if not payload:
         return None
     value = payload.strip()
+    if value.startswith("f_"):
+        return None
     if value.startswith("ref_"):
         value = value[4:]
     if not _CODE_RE.fullmatch(value):

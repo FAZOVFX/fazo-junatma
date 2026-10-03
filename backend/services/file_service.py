@@ -1,12 +1,16 @@
 """File ownership, lifetime, deletion, and upload records."""
 
 import logging
+import re
+import secrets
 from datetime import timedelta
 from types import SimpleNamespace
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.bot import runtime
+from backend.config import get_settings
 from backend.constants import FILE_ACTIVE, FILE_DELETED, FILE_EXPIRED, FILE_LIFETIME_HOURS
 from backend.database.models import File, User
 from backend.services.errors import AppError, GoFileError
@@ -26,6 +30,26 @@ from backend.utils.formatting import as_utc, file_status_label, format_duration,
 from backend.utils.security import is_safe_gofile_url, sanitize_filename
 
 logger = logging.getLogger("fazo")
+_FILE_CODE_RE = re.compile(r"^f_([a-f0-9]{12})$")
+
+
+def parse_file_code(payload: str | None) -> str | None:
+    if not payload:
+        return None
+    match = _FILE_CODE_RE.fullmatch(payload.strip())
+    return match.group(1) if match else None
+
+
+def share_fields(code: str | None) -> dict:
+    if not code:
+        return {"public_code": None, "share_url": None, "page_url": None}
+    username = runtime.bot_username or "BOT_USERNAME"
+    base = (get_settings().webapp_url or "http://localhost:8000").rstrip("/")
+    return {
+        "public_code": code,
+        "share_url": f"https://t.me/{username}?start=f_{code}",
+        "page_url": f"{base}/?file={code}",
+    }
 
 
 def serialize_file(row: File, now, links: dict | None = None) -> dict:
@@ -43,6 +67,7 @@ def serialize_file(row: File, now, links: dict | None = None) -> dict:
         "status_label": file_status_label(row.status if active or row.status != FILE_ACTIVE else FILE_EXPIRED),
         "download_url": None,
         "browser_url": None,
+        **share_fields(row.public_code),
     }
     if active and links:
         payload["download_url"] = links.get("download_url")
@@ -130,6 +155,7 @@ async def create_upload(
         logger.exception("upload failed user=%s", user.telegram_id)
         raise AppError(502, UPLOAD_ERROR) from exc
 
+    public_code = secrets.token_hex(6)
     download_url = stored.get("download_url")
     if not is_safe_gofile_url(download_url):
         logger.error("rejected unsafe download url user=%s", user.telegram_id)
@@ -149,6 +175,7 @@ async def create_upload(
         storage_folder_id=stored.get("storage_folder_id"),
         file_name=safe_name,
         file_size=size_bytes,
+        public_code=public_code,
         download_url=download_url,
         created_at=now,
         expires_at=now + timedelta(hours=FILE_LIFETIME_HOURS),
@@ -165,6 +192,34 @@ async def create_upload(
         raise
     logger.info("file stored id=%s user=%s", record.id, user.telegram_id)
     return serialize_file(record, now, {"download_url": download_url, "browser_url": download_url})
+
+
+async def count_files(session: AsyncSession, user_id: int) -> int:
+    value = await session.scalar(
+        select(func.count()).select_from(File).where(File.user_id == user_id, File.status != FILE_DELETED)
+    )
+    return int(value or 0)
+
+
+async def get_public_file(session: AsyncSession, code: str, now=None) -> dict:
+    now = now or utcnow()
+    row = await session.scalar(select(File).where(File.public_code == code))
+    if row is None or row.status == FILE_DELETED:
+        raise AppError(404, MSG_FILE_NOT_FOUND)
+    if row.status != FILE_ACTIVE or as_utc(row.expires_at) <= now:
+        if row.status == FILE_ACTIVE:
+            row.status = FILE_EXPIRED
+            await session.commit()
+        raise AppError(410, MSG_FILE_EXPIRED)
+    links = share_fields(row.public_code)
+    url = row.download_url if is_safe_gofile_url(row.download_url) else None
+    return {
+        "file_name": row.file_name,
+        "file_size_text": format_size(row.file_size),
+        "download_url": url,
+        "browser_url": url,
+        **links,
+    }
 
 
 async def delete_file(session: AsyncSession, storage: StorageService, user_id: int, file_id: int, confirm: bool, now=None) -> dict:

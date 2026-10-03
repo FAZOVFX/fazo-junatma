@@ -3,18 +3,18 @@
 from aiogram import F, Router
 from aiogram.types import Message
 
-from backend.bot.keyboards import main_menu, payment_amounts
-from backend.config import get_settings
+from backend.bot.keyboards import payment_amounts, subscription_keyboard
+from backend.constants import EXTENSION_PRICE_UZS
 from backend.database.database import session_scope
 from backend.services.referral_service import register_user
 from backend.services.subscription_service import sync_subscription_status
-from backend.texts import BTN_PREMIUM, payment_card_text, premium_text
-from backend.utils.formatting import as_utc, utcnow
+from backend.texts import BTN_PREMIUM, premium_text
+from backend.utils.formatting import format_uzs, utcnow
 
 router = Router(name="subscriptions")
 
 
-@router.message(F.text == BTN_PREMIUM)
+@router.message(F.text.in_({BTN_PREMIUM, "💎 Premium"}))
 async def show_premium(message: Message) -> None:
     now = utcnow()
     async with session_scope() as session:
@@ -27,12 +27,11 @@ async def show_premium(message: Message) -> None:
         )
         sync_subscription_status(user, now)
         await session.commit()
-        remaining = as_utc(user.subscription_expires_at) - now
-        text = premium_text(user.subscription_status, remaining)
-        is_admin = user.telegram_id == get_settings().admin_telegram_id
-    settings = get_settings()
+        text = premium_text(user.subscription_status, user.subscription_expires_at, now)
+    await message.answer(text, reply_markup=subscription_keyboard())
     await message.answer(
-        text + "\n\n" + payment_card_text(settings.payment_card_number, settings.payment_card_name),
+        "💰 Balans\n\n"
+        f"Faylni 24 soatga uzaytirish: {format_uzs(EXTENSION_PRICE_UZS)}.\n"
+        "Balans faqat fayl muddatini uzaytirish uchun ishlatiladi.",
         reply_markup=payment_amounts(),
     )
-    await message.answer("Asosiy menyu", reply_markup=main_menu(is_admin))

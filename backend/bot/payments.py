@@ -19,11 +19,11 @@ from backend.services.notifier import get_notifier
 from backend.services.payment_service import manual_payments
 from backend.services.referral_service import register_user
 from backend.texts import (
-    BTN_BALANCE,
     BTN_PAYMENT,
     CHOOSE_PAYMENT,
     RECEIPT_ACCEPTED,
     balance_text,
+    card_charge_text,
     payment_card_text,
     payment_rejected,
     premium_approved,
@@ -73,7 +73,7 @@ async def payment_menu(message: Message) -> None:
     await message.answer("Asosiy menyu", reply_markup=main_menu(is_admin))
 
 
-@router.message(F.text == BTN_BALANCE)
+@router.message(F.text == "💰 Balans")
 async def show_balance(message: Message) -> None:
     async with session_scope() as session:
         user = await _user(message.from_user, session)
@@ -81,6 +81,41 @@ async def show_balance(message: Message) -> None:
         is_admin = _is_admin(user.telegram_id)
     await message.answer(text, reply_markup=payment_amounts())
     await message.answer("Asosiy menyu", reply_markup=main_menu(is_admin))
+
+
+@router.callback_query(F.data == "sub:back")
+async def subscription_back(callback: CallbackQuery) -> None:
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        logger.info("could not delete subscription message")
+
+
+@router.callback_query(F.data == "sub:card")
+async def subscription_card(callback: CallbackQuery, state: FSMContext) -> None:
+    settings = get_settings()
+    async with session_scope() as session:
+        user = await _user(callback.from_user, session)
+        try:
+            payment = await manual_payments.create_payment(
+                session,
+                user,
+                PAYMENT_PREMIUM,
+                PREMIUM_PRICE_UZS,
+                None,
+                {"source": "bot"},
+            )
+        except AppError as exc:
+            await callback.answer(exc.detail, show_alert=True)
+            return
+    await state.set_state(PayStates.waiting_screenshot)
+    await state.update_data(payment_id=payment.id)
+    await callback.answer()
+    await callback.message.answer(
+        card_charge_text(payment.amount_uzs, settings.payment_card_number, settings.payment_card_name)
+    )
+    logger.info("premium payment created id=%s user=%s", payment.id, callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("topup:"))

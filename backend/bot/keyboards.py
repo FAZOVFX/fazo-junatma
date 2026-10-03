@@ -7,6 +7,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    LinkPreviewOptions,
     ReplyKeyboardMarkup,
     WebAppInfo,
 )
@@ -14,10 +15,9 @@ from aiogram.types import (
 from backend.config import get_settings
 from backend.texts import (
     BTN_ADMIN,
+    BTN_BACK,
     BTN_BALANCE,
-    BTN_FILES,
-    BTN_HELP,
-    BTN_PAYMENT,
+    BTN_CARD,
     BTN_PREMIUM,
     BTN_REFERRAL,
     BTN_UPLOAD,
@@ -28,31 +28,59 @@ def _webapp(screen: str) -> str | None:
     base = get_settings().webapp_url.rstrip("/")
     if not base.startswith("https://"):
         return None
-    return f"{base}/#{screen}"
+    return f"{base}/?screen={screen}"
 
 
 def main_menu(is_admin: bool) -> ReplyKeyboardMarkup:
     upload_url = _webapp("upload")
-    files_url = _webapp("files")
     upload_button = (
         KeyboardButton(text=BTN_UPLOAD, web_app=WebAppInfo(url=upload_url))
         if upload_url
         else KeyboardButton(text=BTN_UPLOAD)
     )
-    files_button = (
-        KeyboardButton(text=BTN_FILES, web_app=WebAppInfo(url=files_url))
-        if files_url
-        else KeyboardButton(text=BTN_FILES)
-    )
     rows = [
-        [upload_button, files_button],
-        [KeyboardButton(text=BTN_BALANCE), KeyboardButton(text=BTN_PREMIUM)],
-        [KeyboardButton(text=BTN_REFERRAL), KeyboardButton(text=BTN_PAYMENT)],
-        [KeyboardButton(text=BTN_HELP)],
+        [upload_button],
+        [KeyboardButton(text=BTN_PREMIUM), KeyboardButton(text=BTN_REFERRAL)],
+        [KeyboardButton(text=BTN_BALANCE)],
     ]
     if is_admin:
         rows.append([KeyboardButton(text=BTN_ADMIN)])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+
+def subscription_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_CARD, callback_data="sub:card")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data="sub:back")],
+        ]
+    )
+
+
+def file_ready_keyboard(share_url: str) -> InlineKeyboardMarkup:
+    share = f"https://t.me/share/url?url={quote(share_url, safe='')}&text={quote('Faylni oching', safe='')}"
+    upload_url = _webapp("upload")
+    rows = [[InlineKeyboardButton(text="↗️ Do'stga yuborish", url=share)]]
+    if upload_url:
+        rows.append([InlineKeyboardButton(text=BTN_UPLOAD, web_app=WebAppInfo(url=upload_url))])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def shared_file_keyboard(page_url: str | None, gofile_url: str | None) -> InlineKeyboardMarkup:
+    rows = []
+    if page_url and page_url.startswith("https://"):
+        rows.append([InlineKeyboardButton(text="📄 Faylni ochish", web_app=WebAppInfo(url=page_url))])
+    if gofile_url and gofile_url.startswith("https://"):
+        rows.append([InlineKeyboardButton(text="🌐 Brauzerda ochish", url=gofile_url)])
+    upload_url = _webapp("upload")
+    if upload_url:
+        rows.append([InlineKeyboardButton(text=BTN_UPLOAD, web_app=WebAppInfo(url=upload_url))])
+    if not rows:
+        rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data="sub:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
 
 
 def payment_amounts() -> InlineKeyboardMarkup:

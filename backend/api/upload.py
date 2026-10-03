@@ -6,9 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api.deps import get_current_user, get_storage_dep
 from backend.database.database import get_session
 from backend.database.models import User
+from backend.bot.keyboards import NO_PREVIEW, file_ready_keyboard
+from backend.bot import runtime
 from backend.services import file_service
 from backend.services.errors import AppError
+from backend.services.notifier import get_notifier
 from backend.services.storage_service import StorageService
+from backend.texts import file_ready_text
 from backend.utils.security import rate_limit_allow
 
 router = APIRouter(tags=["upload"])
@@ -32,7 +36,7 @@ async def upload_file(
     if not rate_limit_allow(f"upload:{user.telegram_id}", 20, 3600):
         raise AppError(429, "Yuklash limiti vaqtincha to‘lgan. Keyinroq urinib ko‘ring.")
     size = _measured_size(file)
-    return await file_service.create_upload(
+    result = await file_service.create_upload(
         session,
         storage,
         user,
@@ -41,3 +45,18 @@ async def upload_file(
         file.content_type,
         size,
     )
+    if result.get("share_url"):
+        await get_notifier().send_message(
+            user.telegram_id,
+            file_ready_text(
+                result["file_name"],
+                result["file_size_text"],
+                result["share_url"],
+                result["page_url"],
+                result.get("download_url") or "",
+                promo_username=runtime.bot_username or "",
+            ),
+            reply_markup=file_ready_keyboard(result["share_url"]),
+            link_preview_options=NO_PREVIEW,
+        )
+    return result

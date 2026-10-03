@@ -28,6 +28,25 @@ async def test_upload_lifetime_and_sanitized_name(api):
     assert body["download_url"].startswith("https://gofile.io/")
 
 
+async def test_public_share_opens_without_owner(api):
+    client, _storage, _factory = api
+    uploaded = await client.post(
+        "/api/files/upload",
+        headers=auth_headers(211),
+        files={"file": ("Spread.zip", b"abcd", "application/zip")},
+    )
+    body = uploaded.json()
+    code = body["public_code"]
+    assert body["share_url"].endswith(f"?start=f_{code}")
+    assert f"?file={code}" in body["page_url"]
+    shared = await client.get(f"/api/share/{code}")
+    assert shared.status_code == 200
+    assert shared.json()["file_name"] == "Spread.zip"
+    assert shared.json()["download_url"].startswith("https://gofile.io/")
+    stranger = await client.get(f"/api/files/{body['id']}", headers=auth_headers(212))
+    assert stranger.status_code == 404
+
+
 async def test_file_ownership_and_open(api):
     client, _storage, _factory = api
     uploaded = await client.post(

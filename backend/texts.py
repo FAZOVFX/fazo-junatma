@@ -2,25 +2,44 @@
 
 from html import escape
 
-from backend.constants import EXTENSION_PRICE_UZS, PREMIUM_DAYS, PREMIUM_PRICE_UZS, TRIAL_DAYS
-from backend.utils.formatting import format_duration, format_uzs, status_label
+from backend.constants import EXTENSION_PRICE_UZS, PREMIUM_DAYS, PREMIUM_PRICE_UZS
+from backend.utils.formatting import as_utc, format_duration, format_uzs
 
 A = "\u2018"  # Uzbek Latin modifier apostrophe
 
-BTN_UPLOAD = "📤 Fayl yuklash"
+BTN_UPLOAD = "✉️ Fayl yuborish"
 BTN_FILES = "📁 Mening fayllarim"
-BTN_BALANCE = "💰 Balans"
-BTN_PREMIUM = "💎 Premium"
+BTN_BALANCE = "👤 Hisobim"
+BTN_PREMIUM = f"💎 Obuna / To{A}lov"
 BTN_REFERRAL = "👥 Referal"
 BTN_PAYMENT = f"💳 To{A}lov"
 BTN_HELP = "ℹ️ Yordam"
 BTN_ADMIN = "👑 Admin panel"
+BTN_CARD = "💳 Karta orqali"
+BTN_BACK = "⬅️ Orqaga"
 
 RECEIPT_ACCEPTED = (
     f"📥 To{A}lov chekingiz qabul qilindi.\n\n"
     f"⏳ To{A}lovni tekshirish 30 daqiqagacha yoki undan ko{A}proq vaqt olishi mumkin.\n\n"
     "Tasdiqlangach, sizga avtomatik xabar yuboramiz."
 )
+
+
+def access_pill(subscription_status: str, expires_at, now) -> str:
+    expires = as_utc(expires_at)
+    remaining = expires - as_utc(now)
+    date = expires.strftime("%d.%m.%Y")
+    seconds = int(remaining.total_seconds())
+    if seconds <= 0 or subscription_status == "expired":
+        return "Obuna muddati tugagan"
+    days = seconds // 86400
+    left = f"{days} kun" if days >= 1 else format_duration(remaining)
+    phrase = f"{left} qoldi ({date} gacha)"
+    if subscription_status == "trial":
+        return f"Bepul sinov: {phrase}"
+    if subscription_status == "active":
+        return f"Premium: {phrase}"
+    return phrase
 
 
 def payment_card_text(card_number: str, card_name: str) -> str:
@@ -40,17 +59,13 @@ def payment_card_text(card_number: str, card_name: str) -> str:
     )
 
 
-def welcome_text(name: str, subscription_status: str, remaining, balance_uzs: int) -> str:
-    trial = ""
-    if subscription_status == "trial":
-        trial = f"\n🆓 Bepul muddat: {TRIAL_DAYS} kun"
+def welcome_text(name: str, subscription_status: str, expires_at, now) -> str:
     return (
-        f"Assalomu alaykum, {escape(name)}!\n\n"
-        "FAZO JUNATMA — katta fayllarni yuklash va ulashish xizmati."
-        f"{trial}\n"
-        f"💎 Obuna: {escape(status_label(subscription_status))}\n"
-        f"⏳ Qolgan vaqt: {format_duration(remaining)}\n"
-        f"💰 Balans: {format_uzs(balance_uzs)}"
+        f"👋 Salom, {escape(name)}!\n\n"
+        "Bu bot istalgan hajmdagi faylni yuklab, sizga xavfsiz link beradi. "
+        "Linkni yuborsangiz, qabul qiluvchi faylni Telegram ichida yuklab oladi.\n\n"
+        f"🎁 {access_pill(subscription_status, expires_at, now)}\n\n"
+        "Boshlash uchun pastdagi tugmani bosing 👇"
     )
 
 
@@ -58,19 +73,59 @@ def balance_text(balance_uzs: int) -> str:
     return f"💰 Balans:\n{format_uzs(balance_uzs)}\n\nBalans fayl muddatini uzaytirish uchun ishlatiladi."
 
 
-def premium_text(subscription_status: str, remaining) -> str:
-    trial = ""
-    if subscription_status == "trial":
-        trial = f"\n\n🆓 Bepul muddat\n{TRIAL_DAYS} kun"
+def premium_text(subscription_status: str, expires_at, now) -> str:
     return (
         "💎 Premium\n\n"
-        f"{format_uzs(PREMIUM_PRICE_UZS)} / {PREMIUM_DAYS} kun\n\n"
-        f"Status: {status_label(subscription_status)}\n"
-        f"⏳ {format_duration(remaining)}"
-        f"{trial}\n\n"
-        "To‘lov tasdiqlangach, qolgan vaqt saqlanadi va 30 kun qo‘shiladi. "
-        "Muddati tugagan bo‘lsa, yangi 30 kun hozirdan boshlanadi."
+        f"Narxi: {format_uzs(PREMIUM_PRICE_UZS)} / {PREMIUM_DAYS} kun.\n"
+        f"Qolgan vaqtga {PREMIUM_DAYS} kun qo‘shiladi. "
+        "Muddat tugagan bo‘lsa, yangi 30 kun hozirdan boshlanadi.\n\n"
+        f"🎁 {access_pill(subscription_status, expires_at, now)}"
     ).replace("‘", A)
+
+
+def card_charge_text(amount: int, card_number: str, card_name: str) -> str:
+    card = f"{card_number} {card_name}".strip()
+    if not card_number or not card_name:
+        card = f"To{A}lov kartasi hozir sozlanmagan. Administrator bilan bog{A}laning."
+    return (
+        f"💳 Karta orqali to{A}lov\n\n"
+        f"Summa: {format_uzs(amount)}\n\n"
+        f"{card}\n\n"
+        f"To{A}lovdan so{A}ng chek (skrinshot)ni shu chatga yuboring — admin tasdiqlaydi."
+    )
+
+
+def account_text(telegram_id: int, subscription_status: str, expires_at, now, invited: int, files: int, balance_uzs: int) -> str:
+    return (
+        "👤 Hisobim\n\n"
+        f"ID: {telegram_id}\n"
+        f"🎁 {access_pill(subscription_status, expires_at, now)}\n"
+        f"Taklif qilinganlar: {invited}\n"
+        f"Fayllaringiz: {files}\n"
+        f"💰 Balans: {format_uzs(balance_uzs)}"
+    )
+
+
+def file_ready_text(name: str, size_text: str, share_url: str, page_url: str, gofile_url: str, promo_username: str = "") -> str:
+    gofile = gofile_url or "—"
+    text = (
+        "<b>✅ Fayl tayyor!</b>\n\n"
+        f"📄 {escape(name)} ({escape(size_text)})\n\n"
+        "🔗 Telegram ichida ochiladigan link:\n"
+        f"{escape(share_url)}\n\n"
+        "💻 Kompyuterda ochish:\n"
+        f"{escape(page_url)}\n\n"
+        "🌐 Gofile: "
+        f"{escape(gofile)}\n\n"
+        "Birinchi linkni yuboring — qabul qiluvchi faylni Telegram ichida yuklab oladi."
+    )
+    if promo_username:
+        text += (
+            "\n\n🚀 Katta fayllarni oson yuboring!\n"
+            "Istalgan hajmdagi faylni yuklab, xavfsiz link oling — tez va qulay.\n"
+            f"👉 https://t.me/{escape(promo_username)}"
+        )
+    return text
 
 
 def referral_text(invited: int, bonus_days: int, link: str) -> str:
@@ -102,7 +157,7 @@ def help_text() -> str:
         f"{format_uzs(PREMIUM_PRICE_UZS)} / {PREMIUM_DAYS} kun. "
         "Agar obuna hali tugamagan bo‘lsa, 30 kun shu muddatga qo‘shiladi.\n\n"
         "🆓 Bepul muddat\n"
-        f"Yangi foydalanuvchi bir marta {TRIAL_DAYS} kun oladi.\n\n"
+        "Yangi foydalanuvchi bir marta 7 kun oladi.\n\n"
         "👥 Referal\n"
         "Har bir yangi odam uchun +1 kun. Bonus mavjud tugash sanasiga qo‘shiladi.\n\n"
         "💰 Hamyon\n"

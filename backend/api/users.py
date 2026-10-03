@@ -11,6 +11,7 @@ from backend.database.models import User
 from backend.services.referral_service import current_bot_username, referral_link, referral_stats
 from backend.services.subscription_service import sync_subscription_status
 from backend.services.wallet_service import list_transactions
+from backend.texts import access_pill
 from backend.utils.formatting import as_utc, format_duration, format_uzs, status_label, utcnow
 
 router = APIRouter(tags=["users"])
@@ -31,6 +32,7 @@ def me_payload(user: User) -> dict:
         "subscription_status": user.subscription_status,
         "subscription_label": status_label(user.subscription_status),
         "remaining_text": format_duration(remaining),
+        "access_text": access_pill(user.subscription_status, user.subscription_expires_at, now),
         "is_trial": user.subscription_status == "trial",
         "is_admin": user.telegram_id == get_settings().admin_telegram_id,
         "subscription_expires_at": as_utc(user.subscription_expires_at).isoformat(),

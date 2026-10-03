@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api import files, payments, upload, users
+from backend.api import files, payments, share, upload, users
 from backend.api.deps import get_storage_dep, require_admin
 from backend.database.database import get_session
 from backend.database.models import User
@@ -13,6 +13,7 @@ from backend.utils.formatting import as_utc, format_uzs
 
 api_router = APIRouter()
 api_router.include_router(users.router)
+api_router.include_router(share.router)
 api_router.include_router(upload.router)
 api_router.include_router(payments.router)
 api_router.include_router(files.router)
