@@ -73,14 +73,18 @@ def balance_text(balance_uzs: int) -> str:
     return f"💰 Balans:\n{format_uzs(balance_uzs)}\n\nBalans fayl muddatini uzaytirish uchun ishlatiladi."
 
 
-def premium_text(subscription_status: str, expires_at, now) -> str:
+def premium_text(subscription_status: str, expires_at, now, balance_uzs: int) -> str:
     return (
-        "💎 Premium\n\n"
+        "Online Storage:\n"
+        "💎 Premium\n"
         f"Narxi: {format_uzs(PREMIUM_PRICE_UZS)} / {PREMIUM_DAYS} kun.\n"
-        f"Qolgan vaqtga {PREMIUM_DAYS} kun qo‘shiladi. "
-        "Muddat tugagan bo‘lsa, yangi 30 kun hozirdan boshlanadi.\n\n"
-        f"🎁 {access_pill(subscription_status, expires_at, now)}"
-    ).replace("‘", A)
+        f"Qolgan vaqtga {PREMIUM_DAYS} kun qo{A}shiladi. "
+        f"Muddat tugagan bo{A}lsa, yangi 30 kun hozirdan boshlanadi.\n"
+        f"🎁 {access_pill(subscription_status, expires_at, now)}\n"
+        f"💰 Balans: {format_uzs(balance_uzs)}\n"
+        f"Faylni 24 soatga uzaytirish: {format_uzs(EXTENSION_PRICE_UZS)}.\n"
+        "Balans faqat fayl muddatini uzaytirish uchun ishlatiladi."
+    )
 
 
 def card_charge_text(amount: int, card_number: str, card_name: str) -> str:

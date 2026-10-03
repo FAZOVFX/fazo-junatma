@@ -59,6 +59,12 @@ def subscription_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def card_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data="sub:offer")]]
+    )
+
+
 def file_ready_keyboard(share_url: str) -> InlineKeyboardMarkup:
     share = f"https://t.me/share/url?url={quote(share_url, safe='')}&text={quote('Faylni oching', safe='')}"
     upload_url = _webapp("upload")

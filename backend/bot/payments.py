@@ -9,7 +9,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from backend.bot.keyboards import main_menu, payment_amounts, payment_review
+from backend.bot.keyboards import card_keyboard, main_menu, payment_amounts, payment_review, subscription_keyboard
+from backend.bot.subscriptions import subscription_message
 from backend.config import get_settings
 from backend.constants import PAYMENT_PREMIUM, PAYMENT_WALLET, PREMIUM_PRICE_UZS
 from backend.database.database import session_scope
@@ -112,10 +113,24 @@ async def subscription_card(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(PayStates.waiting_screenshot)
     await state.update_data(payment_id=payment.id)
     await callback.answer()
-    await callback.message.answer(
-        card_charge_text(payment.amount_uzs, settings.payment_card_number, settings.payment_card_name)
-    )
+    text = card_charge_text(payment.amount_uzs, settings.payment_card_number, settings.payment_card_name)
+    try:
+        await callback.message.edit_text(text, reply_markup=card_keyboard())
+    except Exception:
+        logger.info("could not edit subscription message id=%s", payment.id)
+        await callback.message.answer(text, reply_markup=card_keyboard())
     logger.info("premium payment created id=%s user=%s", payment.id, callback.from_user.id)
+
+
+@router.callback_query(F.data == "sub:offer")
+async def subscription_offer(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    text = await subscription_message(callback.from_user)
+    await callback.answer()
+    try:
+        await callback.message.edit_text(text, reply_markup=subscription_keyboard())
+    except Exception:
+        logger.info("could not restore subscription message")
 
 
 @router.callback_query(F.data.startswith("topup:"))
