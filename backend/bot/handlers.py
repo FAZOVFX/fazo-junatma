@@ -21,12 +21,12 @@ logger = logging.getLogger("fazo")
 router = Router(name="user")
 
 
-async def _send_shared_file(message: Message, code: str, is_admin: bool) -> None:
+async def _send_shared_file(message: Message, code: str) -> None:
     async with session_scope() as session:
         try:
             info = await file_service.get_public_file(session, code)
         except AppError as exc:
-            await send_panel(message, exc.detail, main_menu(is_admin))
+            await message.answer(exc.detail)
             return
     await message.answer(
         file_ready_text(
@@ -35,11 +35,11 @@ async def _send_shared_file(message: Message, code: str, is_admin: bool) -> None
             info["share_url"],
             info["page_url"],
             info["download_url"] or "",
+            for_recipient=True,
         ),
-        reply_markup=shared_file_keyboard(info["page_url"], info["download_url"]),
+        reply_markup=shared_file_keyboard(info["download_url"]),
         link_preview_options=NO_PREVIEW,
     )
-    await send_panel(message, "Boshlash uchun tugmani bosing.", main_menu(is_admin))
 
 
 @router.message(CommandStart())
@@ -69,7 +69,7 @@ async def start(message: Message, command: CommandObject) -> None:
         if created and referral:
             text += "\n\nReferal havola orqali kirdingiz."
     if file_code:
-        await _send_shared_file(message, file_code, is_admin)
+        await _send_shared_file(message, file_code)
         logger.info("start file user=%s created=%s", message.from_user.id, created)
         return
     await send_panel(message, text, main_menu(is_admin))

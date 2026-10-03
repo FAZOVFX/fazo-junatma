@@ -79,10 +79,8 @@ def file_ready_keyboard(share_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def shared_file_keyboard(page_url: str | None, gofile_url: str | None) -> InlineKeyboardMarkup:
+def shared_file_keyboard(gofile_url: str | None) -> InlineKeyboardMarkup:
     rows = []
-    if page_url and page_url.startswith("https://"):
-        rows.append([InlineKeyboardButton(text="📄 Faylni ochish", web_app=WebAppInfo(url=page_url))])
     if gofile_url and gofile_url.startswith("https://"):
         rows.append([InlineKeyboardButton(text="🌐 Brauzerda ochish", url=gofile_url)])
     upload_url = _webapp("upload")

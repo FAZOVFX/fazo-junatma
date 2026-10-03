@@ -110,8 +110,25 @@ def account_text(telegram_id: int, subscription_status: str, expires_at, now, in
     )
 
 
-def file_ready_text(name: str, size_text: str, share_url: str, page_url: str, gofile_url: str, promo_username: str = "") -> str:
+def file_ready_text(
+    name: str,
+    size_text: str,
+    share_url: str,
+    page_url: str,
+    gofile_url: str,
+    promo_username: str = "",
+    for_recipient: bool = False,
+) -> str:
     gofile = gofile_url or "—"
+    if for_recipient:
+        return (
+            "<b>✅ Fayl tayyor!</b>\n\n"
+            f"📄 {escape(name)} ({escape(size_text)})\n\n"
+            "💻 Kompyuterda ochish:\n"
+            f"{escape(page_url)}\n\n"
+            "🌐 Gofile: "
+            f"{escape(gofile)}"
+        )
     text = (
         "<b>✅ Fayl tayyor!</b>\n\n"
         f"📄 {escape(name)} ({escape(size_text)})\n\n"
