@@ -10,8 +10,16 @@ export function setupTelegram() {
   return app;
 }
 
+function fromPageUrl() {
+  const hash = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+  const search = new URLSearchParams(location.search);
+  return hash.get("tgWebAppData") || search.get("tgWebAppData") || "";
+}
+
 export function initData() {
-  return telegram()?.initData || "";
+  const app = telegram();
+  if (app?.ready) app.ready();
+  return app?.initData || fromPageUrl();
 }
 
 export function showPopup(message) {

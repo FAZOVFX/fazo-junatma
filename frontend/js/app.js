@@ -123,7 +123,11 @@ function fileCode() {
 }
 
 function screenName() {
-  return new URLSearchParams(location.search).get("screen") || (location.hash || "").replace("#", "") || "upload";
+  const screen = new URLSearchParams(location.search).get("screen");
+  if (screen) return screen;
+  const hash = (location.hash || "").replace(/^#/, "");
+  if (!hash || hash.includes("tgWebAppData=") || hash.includes("=")) return "upload";
+  return hash;
 }
 
 function docIcon() {
@@ -175,7 +179,7 @@ function renderUpload(me) {
   async function begin(file) {
     if (!file) return;
     if (!initData()) {
-      panel.append(h("p", "error", "Fayl yuklash Telegram ichida ochiladi. Kompyuterdan tayyor fayl havolasini ochish mumkin."));
+      panel.append(h("p", "error", "Fayl yuborilmadi. Botdagi «Fayl yuborish» tugmasini bosing. Sayt manzilini brauzerda ochsangiz, fayl tanlash ishlamaydi."));
       return;
     }
     drop.hidden = true;

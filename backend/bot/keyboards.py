@@ -28,6 +28,8 @@ def _webapp(screen: str) -> str | None:
     base = get_settings().webapp_url.rstrip("/")
     if not base.startswith("https://"):
         return None
+    if screen in {"", "upload", "home"}:
+        return f"{base}/"
     return f"{base}/?screen={screen}"
 
 
