@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: fazo-junatma
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: BOT_TOKEN
+        sync: false
+      - key: GOFILE_API_TOKEN
+        sync: false
+      - key: GOFILE_ACCOUNT_ID
+        sync: false
+      - key: ADMIN_TELEGRAM_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: PAYMENT_CARD_NUMBER
+        sync: false
+      - key: PAYMENT_CARD_NAME
+        sync: false
+      - key: GOFILE_MAX_STORAGE_GB
+        sync: false
+      - key: GOFILE_MAX_FILE_SIZE_GB
+        sync: false
+      - key: GOFILE_STORAGE_WARNING_PERCENT
+        sync: false
+      - key: GOFILE_STORAGE_BLOCK_PERCENT
+        sync: false

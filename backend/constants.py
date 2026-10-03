@@ -1,0 +1,37 @@
+"""Business rules. Amounts are integer UZS. Durations are fixed by the product spec."""
+
+TRIAL_DAYS = 7
+REFERRAL_REWARD_DAYS = 1
+PREMIUM_PRICE_UZS = 15_000
+PREMIUM_DAYS = 30
+FILE_LIFETIME_HOURS = 24
+EXTENSION_PRICE_UZS = 5_000
+EXTENSION_HOURS = 24
+
+MIN_TOPUP_UZS = 1_000
+MAX_TOPUP_UZS = 10_000_000
+TOPUP_PRESETS_UZS = (5_000, 10_000, 15_000, 20_000)
+
+MAX_PENDING_PAYMENTS = 10
+INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60
+
+SUBSCRIPTION_TRIAL = "trial"
+SUBSCRIPTION_ACTIVE = "active"
+SUBSCRIPTION_EXPIRED = "expired"
+
+FILE_ACTIVE = "active"
+FILE_EXPIRED = "expired"
+FILE_DELETED = "deleted"
+
+PAYMENT_PENDING = "pending"
+PAYMENT_APPROVED = "approved"
+PAYMENT_REJECTED = "rejected"
+
+PAYMENT_PREMIUM = "premium"
+PAYMENT_WALLET = "wallet_topup"
+PAYMENT_METHOD_MANUAL = "manual"
+
+WALLET_TOPUP = "topup"
+WALLET_EXTENSION = "file_extension"
+WALLET_REFUND = "refund"
+WALLET_ADMIN = "admin_adjustment"
