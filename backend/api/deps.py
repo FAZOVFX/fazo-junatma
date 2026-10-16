@@ -24,16 +24,10 @@ def _init_data_from_headers(x_telegram_init_data: str | None, authorization: str
     return ""
 
 
-async def get_current_user(
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-    x_telegram_init_data: str | None = Header(default=None),
-    authorization: str | None = Header(default=None),
-) -> User:
+async def resolve_user(request: Request, session: AsyncSession, init_data: str) -> User:
     ip = request.client.host if request.client else "unknown"
     if not rate_limit_allow(f"ip:{ip}", 600, 60):
         raise HTTPException(status_code=429, detail="Juda ko‘p so‘rov. Biroz kuting.")
-    init_data = _init_data_from_headers(x_telegram_init_data, authorization)
     if not init_data:
         raise HTTPException(status_code=401, detail="Telegram autentifikatsiyasi talab qilinadi.")
     settings = get_settings()
@@ -55,6 +49,16 @@ async def get_current_user(
         referral_code=referral,
     )
     return user
+
+
+async def get_current_user(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    x_telegram_init_data: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> User:
+    init_data = _init_data_from_headers(x_telegram_init_data, authorization)
+    return await resolve_user(request, session, init_data)
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:

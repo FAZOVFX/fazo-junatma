@@ -15,6 +15,7 @@ export function uploadFile(file, onProgress) {
     xhr.open("POST", "/api/files/upload");
     const data = initData();
     if (data) {
+      form.append("init_data", data);
       xhr.setRequestHeader("X-Telegram-Init-Data", data);
       xhr.setRequestHeader("Authorization", `tma ${data}`);
     }
@@ -37,7 +38,9 @@ export function uploadFile(file, onProgress) {
       let payload = {};
       try { payload = JSON.parse(xhr.responseText || "{}"); } catch (_error) { payload = {}; }
       if (xhr.status >= 200 && xhr.status < 300) resolve(payload);
-      else reject(new Error(typeof payload.detail === "string" ? payload.detail : "Yuklashda xatolik"));
+      else if (xhr.status === 502 || xhr.status === 503 || !xhr.responseText || xhr.responseText.trim().startsWith("<")) {
+        reject(new Error("Server javob bermadi. Bir necha soniyadan keyin qayta urinib ko‘ring."));
+      } else reject(new Error(typeof payload.detail === "string" ? payload.detail : "Yuklashda xatolik"));
     };
     xhr.onerror = () => reject(new Error("Tarmoq xatoligi"));
     xhr.onabort = () => reject(new Error("Bekor qilindi"));

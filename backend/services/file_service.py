@@ -21,7 +21,9 @@ from backend.texts import (
     MSG_FILE_EXPIRED,
     MSG_FILE_NOT_FOUND,
     FILE_TOO_LARGE,
+    GOFILE_LIMIT,
     GOFILE_NOT_CONFIGURED,
+    GOFILE_TOKEN_INVALID,
     SUBSCRIPTION_REQUIRED,
     UPLOAD_ERROR,
     UPLOAD_STOPPED,
@@ -150,6 +152,10 @@ async def create_upload(
         logger.info("upload failed user=%s status=%s", user.telegram_id, exc.status)
         if exc.status == "not-configured":
             raise AppError(503, GOFILE_NOT_CONFIGURED) from exc
+        if exc.status == "error-token":
+            raise AppError(502, GOFILE_TOKEN_INVALID) from exc
+        if exc.status in {"error-limits", "error-rateLimit"}:
+            raise AppError(429, GOFILE_LIMIT) from exc
         raise AppError(502, UPLOAD_ERROR) from exc
     except Exception as exc:
         logger.exception("upload failed user=%s", user.telegram_id)

@@ -281,3 +281,5 @@ CONFIRM_REQUIRED = "Tasdiqlash kerak."
 UPLOAD_STOPPED = storage_blocked()
 FILE_TOO_LARGE = "Fayl hajmi ruxsat etilgan chegaradan katta."
 GOFILE_NOT_CONFIGURED = "Fayl saqlash xizmati hozir sozlanmagan."
+GOFILE_TOKEN_INVALID = "GoFile token yaroqsiz. Profil sahifasidagi tokenni yangilab, serverga qayta qo‘ying.".replace("‘", A)
+GOFILE_LIMIT = "GoFile limiti to‘lgan. Birozdan keyin urinib ko‘ring.".replace("‘", A)

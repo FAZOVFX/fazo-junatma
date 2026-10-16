@@ -10,6 +10,20 @@ from tests.fakes import FakeStorage
 NOW = datetime(2026, 5, 1, tzinfo=timezone.utc)
 
 
+async def test_upload_accepts_login_in_the_form_body(api):
+    from tests.conftest import make_init_data
+
+    client, storage, _factory = api
+    raw = make_init_data({"id": 515, "first_name": "Ali", "username": "ali"})
+    response = await client.post(
+        "/api/files/upload",
+        data={"init_data": raw},
+        files={"file": ("note.txt", b"hello", "text/plain")},
+    )
+    assert response.status_code == 200, response.text
+    assert storage.uploaded == ["note.txt"]
+
+
 async def test_upload_lifetime_and_sanitized_name(api):
     client, storage, _factory = api
     response = await client.post(
