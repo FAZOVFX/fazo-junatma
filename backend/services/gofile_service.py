@@ -43,18 +43,18 @@ class GoFileService:
         account_id: str = "",
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
-        self._token = token or ""
-        self._account_id = account_id or ""
+        self._token = (token or "").strip()
+        self._account_id = (account_id or "").strip()
         self._http = http_client
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
 
-    async def _owned_client(self) -> tuple[httpx.AsyncClient, bool]:
+    async def _owned_client(self, timeout: httpx.Timeout | None = None) -> tuple[httpx.AsyncClient, bool]:
         if self._http is not None:
             return self._http, False
-        timeout = httpx.Timeout(600.0, connect=30.0)
-        return httpx.AsyncClient(timeout=timeout), True
+        client_timeout = timeout or httpx.Timeout(600.0, connect=30.0)
+        return httpx.AsyncClient(timeout=client_timeout), True
 
     def _payload(self, response: httpx.Response) -> dict:
         try:
@@ -88,6 +88,7 @@ class GoFileService:
         download_url = self.create_download_link(
             download_page=data.get("downloadPage"),
             parent_folder_code=data.get("parentFolderCode"),
+            file_code=data.get("code"),
         )
         file_id = data.get("id")
         if not file_id:
@@ -100,13 +101,20 @@ class GoFileService:
             "file_size": int(data.get("size") or 0),
         }
 
-    def create_download_link(self, *, download_page: str | None, parent_folder_code: str | None = None) -> str:
+    def create_download_link(
+        self,
+        *,
+        download_page: str | None,
+        parent_folder_code: str | None = None,
+        file_code: str | None = None,
+    ) -> str:
         if is_safe_gofile_url(download_page):
             return str(download_page)
-        if parent_folder_code and _CODE.fullmatch(parent_folder_code):
-            url = f"https://gofile.io/d/{parent_folder_code}"
-            if is_safe_gofile_url(url):
-                return url
+        for code in (parent_folder_code, file_code):
+            if code and _CODE.fullmatch(str(code)):
+                url = f"https://gofile.io/d/{code}"
+                if is_safe_gofile_url(url):
+                    return url
         raise GoFileError("invalid-download-url")
 
     async def get_file_info(self, content_id: str) -> dict | None:
@@ -167,7 +175,7 @@ class GoFileService:
         """Account statsCurrent.storage when the API returns it. Never returns the token."""
         if not self._token:
             return None
-        client, close = await self._owned_client()
+        client, close = await self._owned_client(httpx.Timeout(12.0, connect=5.0))
         try:
             account_id = self._account_id
             if not account_id:
@@ -179,8 +187,9 @@ class GoFileService:
                 return None
             response = await client.get(f"{API_BASE}/accounts/{account_id}", headers=self._headers())
             data = self._payload(response)
-        except GoFileError as exc:
-            logger.info("gofile storage stats unavailable status=%s", exc.status)
+        except (GoFileError, httpx.HTTPError) as exc:
+            status = getattr(exc, "status", None) or type(exc).__name__
+            logger.info("gofile storage stats unavailable status=%s", status)
             return None
         finally:
             if close:

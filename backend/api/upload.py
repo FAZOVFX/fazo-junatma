@@ -1,11 +1,10 @@
 """Streaming upload. The file object is forwarded to GoFile without reading it all into memory."""
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.deps import get_current_user, get_storage_dep
+from backend.api.deps import _init_data_from_headers, get_storage_dep, resolve_user
 from backend.database.database import get_session
-from backend.database.models import User
 from backend.bot.keyboards import NO_PREVIEW, file_ready_keyboard
 from backend.bot import runtime
 from backend.services import file_service
@@ -28,11 +27,16 @@ def _measured_size(upload: UploadFile) -> int:
 
 @router.post("/files/upload")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
+    init_data: str = Form(""),
     session: AsyncSession = Depends(get_session),
     storage: StorageService = Depends(get_storage_dep),
+    x_telegram_init_data: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
 ):
+    raw = _init_data_from_headers(x_telegram_init_data, authorization) or init_data
+    user = await resolve_user(request, session, raw)
     if not rate_limit_allow(f"upload:{user.telegram_id}", 20, 3600):
         raise AppError(429, "Yuklash limiti vaqtincha to‘lgan. Keyinroq urinib ko‘ring.")
     size = _measured_size(file)

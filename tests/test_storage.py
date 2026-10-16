@@ -24,6 +24,12 @@ def _settings(**overrides):
     return SimpleNamespace(**values)
 
 
+def test_download_link_falls_back_to_file_code():
+    service = GoFileService("token")
+    url = service.create_download_link(download_page=None, file_code="Qp9w8eR7")
+    assert url == "https://gofile.io/d/Qp9w8eR7"
+
+
 def test_filename_strips_path_traversal():
     assert sanitize_filename("../../etc/passwd") == "passwd"
     assert "/" not in sanitize_filename("..\\..\\secret.txt")
