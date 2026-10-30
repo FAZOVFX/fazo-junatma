@@ -3,6 +3,7 @@
 import logging
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 
 from backend.bot.keyboards import admin_menu, payment_review
@@ -14,7 +15,7 @@ from backend.services.admin_service import list_users, list_wallet_operations, s
 from backend.services.payment_service import manual_payments
 from backend.services.storage_service import get_storage
 from backend.texts import BTN_ADMIN
-from backend.utils.formatting import format_uzs, status_label
+from backend.utils.formatting import as_utc, format_uzs, status_label
 
 logger = logging.getLogger("fazo")
 router = Router(name="admin")
@@ -75,18 +76,32 @@ async def pending_payments(callback: CallbackQuery) -> None:
     for payment, user in payloads:
         text = (
             "💳 Kutilayotgan to‘lov\n\n"
-            f"Foydalanuvchi: {user.first_name if user else '-'}\n"
+            f"Foydalanuvchi: {(user.first_name if user else None) or '-'}\n"
             f"Telegram ID: {user.telegram_id if user else '-'}\n"
             f"Summa: {format_uzs(payment.amount_uzs)}\n"
             f"Turi: {payment.type}\n"
-            f"Yaratilgan: {payment.created_at}\n"
+            f"Yaratilgan: {as_utc(payment.created_at):%d.%m.%Y %H:%M} UTC\n"
             f"Holat: {payment.status}"
         )
-        markup = payment_review(payment.id)
-        if payment.screenshot_file_id:
-            await callback.message.answer_photo(payment.screenshot_file_id, caption=text, reply_markup=markup)
-        else:
-            await callback.message.answer(text + "\n\nSkrinshot hali yo‘q.", reply_markup=markup)
+        await _send_pending(callback.message, payment, text)
+
+
+async def _send_pending(message: Message, payment, text: str) -> None:
+    """One payment card. A receipt sent to the bot as a file is a document, not a photo."""
+    markup = payment_review(payment.id)
+    file_id = payment.screenshot_file_id
+    if file_id:
+        for send in (message.answer_photo, message.answer_document):
+            try:
+                await send(file_id, caption=text, reply_markup=markup)
+                return
+            except TelegramBadRequest:
+                continue
+        logger.warning("receipt could not be shown payment=%s", payment.id)
+        text += "\n\nSkrinshotni ochib bo‘lmadi."
+    else:
+        text += "\n\nSkrinshot hali yo‘q."
+    await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "adm:users")

@@ -71,3 +71,28 @@ async def test_api_reject(api):
     assert rejected.json()["result"] == "rejected"
     wallet = await client.get("/api/wallet", headers=auth_headers(802))
     assert wallet.json()["balance_uzs"] == 0
+
+
+async def test_admin_pending_card_falls_back_to_document():
+    from types import SimpleNamespace
+
+    from aiogram.exceptions import TelegramBadRequest
+
+    from backend.bot.admin import _send_pending
+
+    sent = []
+
+    class Chat:
+        async def answer_photo(self, file_id, caption, reply_markup):
+            raise TelegramBadRequest(None, "can't use file of type Document as Photo")
+
+        async def answer_document(self, file_id, caption, reply_markup):
+            sent.append(("document", file_id))
+
+        async def answer(self, text, reply_markup):
+            sent.append(("text", text))
+
+    await _send_pending(Chat(), SimpleNamespace(id=7, screenshot_file_id="doc-id"), "card")
+    await _send_pending(Chat(), SimpleNamespace(id=8, screenshot_file_id=None), "card")
+    assert sent[0] == ("document", "doc-id")
+    assert sent[1][0] == "text" and "Skrinshot hali yo" in sent[1][1]
