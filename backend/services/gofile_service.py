@@ -65,7 +65,9 @@ class GoFileService:
         try:
             body = response.json()
         except Exception as exc:
-            raise GoFileError("invalid-response") from exc
+            snippet = " ".join(response.text[:300].split())
+            logger.warning("gofile non-json http=%s body=%r", response.status_code, snippet)
+            raise GoFileError(f"invalid-response-http-{response.status_code}") from exc
         if not isinstance(body, dict):
             raise GoFileError("invalid-response")
         status = str(body.get("status") or f"http-{response.status_code}")
