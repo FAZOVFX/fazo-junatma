@@ -7,6 +7,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 from sqlalchemy import func, select
+from starlette.requests import ClientDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.bot import runtime
@@ -201,10 +202,13 @@ async def _store_upload(session: AsyncSession, storage: StorageService, user: Us
             raise AppError(429, GOFILE_LIMIT) from exc
         if exc.status == "size-mismatch":
             raise AppError(400, UPLOAD_INCOMPLETE) from exc
-        raise AppError(502, UPLOAD_ERROR) from exc
+        raise AppError(502, f"{UPLOAD_ERROR} (kod: {exc.status})") from exc
+    except ClientDisconnect as exc:
+        logger.info("upload aborted by client user=%s", user.telegram_id)
+        raise AppError(400, UPLOAD_INCOMPLETE) from exc
     except Exception as exc:
         logger.exception("upload failed user=%s", user.telegram_id)
-        raise AppError(502, UPLOAD_ERROR) from exc
+        raise AppError(502, f"{UPLOAD_ERROR} (kod: {type(exc).__name__})") from exc
 
     public_code = secrets.token_hex(6)
     download_url = stored.get("download_url")

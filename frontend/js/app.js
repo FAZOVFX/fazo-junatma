@@ -1,5 +1,5 @@
 import { initData, setupTelegram, showPopup, telegram } from "./telegram.js";
-import { formatSize, uploadFile } from "./upload.js?v=6";
+import { formatSize, uploadFile } from "./upload.js?v=7";
 
 const screen = document.querySelector("#screen");
 const title = document.querySelector("#title");
