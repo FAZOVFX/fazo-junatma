@@ -45,7 +45,11 @@ class UploadSizeLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope.get("path") == "/api/files/upload" and scope.get("method") == "POST":
+        if (
+            scope["type"] == "http"
+            and str(scope.get("path") or "").startswith("/api/files/upload")
+            and scope.get("method") in {"POST", "PUT"}
+        ):
             headers = {key.decode("latin1").lower(): value.decode("latin1") for key, value in scope.get("headers", [])}
             raw_length = headers.get("content-length")
             settings = get_settings()

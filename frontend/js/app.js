@@ -1,5 +1,5 @@
 import { initData, setupTelegram, showPopup, telegram } from "./telegram.js";
-import { formatSize, uploadFile } from "./upload.js";
+import { formatSize, uploadFile } from "./upload.js?v=6";
 
 const screen = document.querySelector("#screen");
 const title = document.querySelector("#title");
@@ -187,13 +187,20 @@ function renderUpload(me) {
     status.textContent = file.name;
     cancel.onclick = () => uploadCancel?.();
     try {
-      const result = await uploadFile(file, (event) => {
-        uploadCancel = event.cancel;
-        fill.style.width = `${event.percent}%`;
-        status.textContent = `${event.percent}% · ${formatSize(event.loaded)} / ${formatSize(event.total)}`;
-      });
+      const result = await uploadFile(
+        file,
+        (event) => {
+          fill.style.width = `${event.percent}%`;
+          status.textContent = event.percent >= 100
+            ? "Yuklandi. Havola tayyorlanmoqda…"
+            : `${event.percent}% · ${formatSize(event.loaded)} / ${formatSize(event.total)}`;
+        },
+        (abort) => { uploadCancel = abort; },
+      );
+      uploadCancel = null;
       success(result);
     } catch (error) {
+      uploadCancel = null;
       panel.append(h("p", "error", error.message));
       drop.hidden = false;
       progress.hidden = true;

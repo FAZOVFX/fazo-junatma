@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -34,6 +36,9 @@ logger = logging.getLogger("fazo")
 UPLOAD_URL = "https://upload.gofile.io/uploadfile"
 API_BASE = "https://api.gofile.io"
 _CODE = re.compile(r"^[A-Za-z0-9]{4,32}$")
+# Multi-gigabyte files: GoFile may take a long time to answer after the last byte,
+# so the read wait is generous instead of the 10-minute default.
+_UPLOAD_TIMEOUT = httpx.Timeout(connect=30.0, read=3600.0, write=600.0, pool=60.0)
 
 
 class GoFileService:
@@ -75,16 +80,72 @@ class GoFileService:
     async def upload_file(self, file_obj, filename: str, content_type: str | None = None) -> dict:
         if not self._token:
             raise GoFileError("not-configured")
-        client, close = await self._owned_client()
+        client, close = await self._owned_client(_UPLOAD_TIMEOUT)
         try:
             files = {
                 "file": (filename, file_obj, content_type or "application/octet-stream"),
             }
-            response = await client.post(UPLOAD_URL, headers=self._headers(), files=files)
+            response = await client.post(UPLOAD_URL, headers=self._headers(), files=files, timeout=_UPLOAD_TIMEOUT)
             data = self._payload(response)
         finally:
             if close:
                 await client.aclose()
+        return self._stored(data, filename)
+
+    async def upload_stream(
+        self,
+        chunks: AsyncIterator[bytes],
+        filename: str,
+        content_type: str | None,
+        size: int,
+    ) -> dict:
+        """Forward an incoming byte stream to GoFile as it arrives, without a temp file.
+
+        Large files never touch the local disk, and GoFile receives the bytes while the
+        browser is still sending them, so the link is ready right after the last chunk.
+        """
+        if not self._token:
+            raise GoFileError("not-configured")
+        boundary = secrets.token_hex(16)
+        safe = filename.replace('"', "%22").replace("\r", "%0D").replace("\n", "%0A")
+        head = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{safe}"\r\n'
+            f"Content-Type: {content_type or 'application/octet-stream'}\r\n\r\n"
+        ).encode("utf-8")
+        tail = f"\r\n--{boundary}--\r\n".encode()
+
+        async def body() -> AsyncIterator[bytes]:
+            yield head
+            sent = 0
+            async for chunk in chunks:
+                if not chunk:
+                    continue
+                sent += len(chunk)
+                if sent > size:
+                    raise GoFileError("size-mismatch")
+                yield chunk
+            if sent != size:
+                raise GoFileError("size-mismatch")
+            yield tail
+
+        headers = {
+            **self._headers(),
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(len(head) + size + len(tail)),
+        }
+        client, close = await self._owned_client(_UPLOAD_TIMEOUT)
+        try:
+            response = await client.post(UPLOAD_URL, headers=headers, content=body(), timeout=_UPLOAD_TIMEOUT)
+            if response.status_code >= 400:
+                logger.warning("gofile upload http=%s", response.status_code)
+            data = self._payload(response)
+        finally:
+            if close:
+                await client.aclose()
+        return self._stored(data, filename)
+
+    def _stored(self, data: dict, filename: str) -> dict:
         download_url = self.create_download_link(
             download_page=data.get("downloadPage"),
             parent_folder_code=data.get("parentFolderCode"),

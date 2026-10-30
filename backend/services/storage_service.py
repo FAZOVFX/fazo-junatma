@@ -107,6 +107,9 @@ class StorageService:
     async def upload_file(self, file_obj, filename: str, content_type: str | None = None) -> dict:
         return await self.gofile.upload_file(file_obj, filename, content_type)
 
+    async def upload_stream(self, chunks, filename: str, content_type: str | None, size: int) -> dict:
+        return await self.gofile.upload_stream(chunks, filename, content_type, size)
+
     def create_download_link(self, *, download_page: str | None, parent_folder_code: str | None = None) -> str:
         return self.gofile.create_download_link(
             download_page=download_page,

@@ -26,6 +26,7 @@ from backend.texts import (
     GOFILE_TOKEN_INVALID,
     SUBSCRIPTION_REQUIRED,
     UPLOAD_ERROR,
+    UPLOAD_INCOMPLETE,
     UPLOAD_STOPPED,
 )
 from backend.utils.formatting import as_utc, file_status_label, format_duration, format_size, utcnow
@@ -123,6 +124,27 @@ async def get_file(session: AsyncSession, storage: StorageService, user_id: int,
     return serialize_file(row, now, links)
 
 
+async def check_upload_allowed(
+    session: AsyncSession,
+    storage: StorageService,
+    user: User,
+    size_bytes: int,
+    now=None,
+) -> None:
+    now = now or utcnow()
+    sync_subscription_status(user, now)
+    if not subscription_is_valid(user, now):
+        await session.commit()
+        raise AppError(403, SUBSCRIPTION_REQUIRED)
+    if size_bytes <= 0:
+        raise AppError(422, "Bo‘sh fayl yuborildi.")
+    decision = await storage.check_can_upload(session, size_bytes)
+    if not decision.allowed:
+        if decision.reason == "file_too_large":
+            raise AppError(413, FILE_TOO_LARGE)
+        raise AppError(409, UPLOAD_STOPPED)
+
+
 async def create_upload(
     session: AsyncSession,
     storage: StorageService,
@@ -134,20 +156,41 @@ async def create_upload(
     now=None,
 ) -> dict:
     now = now or utcnow()
-    sync_subscription_status(user, now)
-    if not subscription_is_valid(user, now):
-        await session.commit()
-        raise AppError(403, SUBSCRIPTION_REQUIRED)
+    await check_upload_allowed(session, storage, user, size_bytes, now)
     safe_name = sanitize_filename(filename)
-    if size_bytes <= 0:
-        raise AppError(422, "Bo‘sh fayl yuborildi.")
-    decision = await storage.check_can_upload(session, size_bytes)
-    if not decision.allowed:
-        if decision.reason == "file_too_large":
-            raise AppError(413, FILE_TOO_LARGE)
-        raise AppError(409, UPLOAD_STOPPED)
+    return await _store_upload(
+        session, storage, user, storage.upload_file(file_obj, safe_name, content_type), safe_name, size_bytes, now
+    )
+
+
+async def create_streamed_upload(
+    session: AsyncSession,
+    storage: StorageService,
+    user: User,
+    chunks,
+    filename: str,
+    content_type: str | None,
+    size_bytes: int,
+    now=None,
+) -> dict:
+    """Same as create_upload, but the bytes go to GoFile as they arrive from the browser."""
+    now = now or utcnow()
+    await check_upload_allowed(session, storage, user, size_bytes, now)
+    safe_name = sanitize_filename(filename)
+    return await _store_upload(
+        session,
+        storage,
+        user,
+        storage.upload_stream(chunks, safe_name, content_type, size_bytes),
+        safe_name,
+        size_bytes,
+        now,
+    )
+
+
+async def _store_upload(session: AsyncSession, storage: StorageService, user: User, pending, safe_name: str, size_bytes: int, now) -> dict:
     try:
-        stored = await storage.upload_file(file_obj, safe_name, content_type)
+        stored = await pending
     except GoFileError as exc:
         logger.info("upload failed user=%s status=%s", user.telegram_id, exc.status)
         if exc.status == "not-configured":
@@ -156,6 +199,8 @@ async def create_upload(
             raise AppError(502, GOFILE_TOKEN_INVALID) from exc
         if exc.status in {"error-limits", "error-rateLimit"}:
             raise AppError(429, GOFILE_LIMIT) from exc
+        if exc.status == "size-mismatch":
+            raise AppError(400, UPLOAD_INCOMPLETE) from exc
         raise AppError(502, UPLOAD_ERROR) from exc
     except Exception as exc:
         logger.exception("upload failed user=%s", user.telegram_id)

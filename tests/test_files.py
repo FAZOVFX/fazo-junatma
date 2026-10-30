@@ -166,3 +166,49 @@ async def test_expiration_closes_the_file(database):
         assert False
     except Exception as exc:
         assert exc.status_code == 410
+
+
+async def test_streamed_upload_with_ticket(api):
+    client, storage, _factory = api
+    start = await client.post(
+        "/api/files/upload/start",
+        headers=auth_headers(301),
+        json={"file_name": "../movie.mkv", "file_size": 6, "content_type": "video/x-matroska"},
+    )
+    assert start.status_code == 200, start.text
+    url = start.json()["upload_url"]
+    response = await client.put(url, content=b"abcdef")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["file_name"] == "movie.mkv"
+    assert body["file_size"] == 6
+    assert body["download_url"].startswith("https://gofile.io/")
+    assert storage.streamed == b"abcdef"
+    again = await client.put(url, content=b"abcdef")
+    assert again.status_code == 410
+
+
+async def test_streamed_upload_login_in_body_and_size_checked(api):
+    from tests.conftest import make_init_data
+
+    client, storage, _factory = api
+    raw = make_init_data({"id": 302, "first_name": "Ali", "username": "ali"})
+    start = await client.post(
+        "/api/files/upload/start",
+        json={"file_name": "a.bin", "file_size": 10, "init_data": raw},
+    )
+    assert start.status_code == 200, start.text
+    wrong = await client.put(start.json()["upload_url"], content=b"short")
+    assert wrong.status_code == 400
+    assert storage.uploaded == []
+
+
+async def test_streamed_upload_refused_when_storage_full(api):
+    client, storage, _factory = api
+    storage.block = True
+    start = await client.post(
+        "/api/files/upload/start",
+        headers=auth_headers(303),
+        json={"file_name": "huge.bin", "file_size": 11 * (1024**3)},
+    )
+    assert start.status_code == 409

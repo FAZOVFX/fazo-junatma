@@ -271,6 +271,7 @@ def referral_reward_notice(remaining) -> str:
 
 
 UPLOAD_ERROR = "❌ Faylni yuklashda xatolik yuz berdi."
+UPLOAD_INCOMPLETE = "Fayl to‘liq yetib kelmadi. Internetni tekshirib, qayta yuboring.".replace("‘", A)
 SUBSCRIPTION_REQUIRED = (
     "Obuna muddati tugagan. Fayl yuklash uchun Premium oling yoki referal orqali kun qo‘shing."
 ).replace("‘", A)
