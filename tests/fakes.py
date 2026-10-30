@@ -9,6 +9,7 @@ class FakeStorage:
         self.deleted: list[str] = []
         self.fail_delete = False
         self.block = False
+        self.streamed = b""
 
     async def check_can_upload(self, session, size_bytes: int) -> StorageDecision:
         if self.block:
@@ -26,6 +27,20 @@ class FakeStorage:
             "download_url": "https://gofile.io/d/abcd1234",
             "file_name": filename,
             "file_size": size,
+        }
+
+    async def upload_stream(self, chunks, filename: str, content_type: str | None, size: int) -> dict:
+        received = b""
+        async for chunk in chunks:
+            received += chunk
+        self.uploaded.append(filename)
+        self.streamed = received
+        return {
+            "storage_file_id": f"file-{filename}",
+            "storage_folder_id": f"folder-{filename}",
+            "download_url": "https://gofile.io/d/abcd1234",
+            "file_name": filename,
+            "file_size": len(received),
         }
 
     async def delete_remote(self, file_row) -> bool:

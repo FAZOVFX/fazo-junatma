@@ -24,6 +24,12 @@ def _settings(**overrides):
     return SimpleNamespace(**values)
 
 
+def test_download_link_falls_back_to_file_code():
+    service = GoFileService("token")
+    url = service.create_download_link(download_page=None, file_code="Qp9w8eR7")
+    assert url == "https://gofile.io/d/Qp9w8eR7"
+
+
 def test_filename_strips_path_traversal():
     assert sanitize_filename("../../etc/passwd") == "passwd"
     assert "/" not in sanitize_filename("..\\..\\secret.txt")
@@ -129,3 +135,58 @@ async def test_gofile_uses_documented_endpoints_and_hides_token():
     with pytest.raises(GoFileError) as caught:
         await failing.upload_file(io.BytesIO(b"x"), "b.txt")
     assert secret not in str(caught.value)
+
+
+async def test_upload_stream_forwards_bytes_as_multipart():
+    seen = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = await request.aread()
+        seen["url"] = str(request.url)
+        seen["length"] = request.headers["content-length"]
+        seen["type"] = request.headers["content-type"]
+        seen["body"] = body
+        return httpx.Response(
+            200,
+            json={
+                "status": "ok",
+                "data": {
+                    "id": "file-uuid",
+                    "parentFolder": "folder-uuid",
+                    "downloadPage": "https://gofile.io/d/x7k2p9Qm",
+                    "name": "big.bin",
+                    "size": 10,
+                },
+            },
+        )
+
+    async def chunks():
+        yield b"01234"
+        yield b"56789"
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        service = GoFileService("token", http_client=client)
+        stored = await service.upload_stream(chunks(), "big.bin", "application/octet-stream", 10)
+
+    assert seen["url"] == UPLOAD_URL
+    assert int(seen["length"]) == len(seen["body"])
+    assert seen["type"].startswith("multipart/form-data; boundary=")
+    assert b'name="file"; filename="big.bin"' in seen["body"]
+    assert b"\r\n\r\n0123456789\r\n--" in seen["body"]
+    assert stored["download_url"] == "https://gofile.io/d/x7k2p9Qm"
+    assert stored["storage_file_id"] == "file-uuid"
+
+
+async def test_upload_stream_rejects_short_body():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await request.aread()
+        return httpx.Response(200, json={"status": "ok", "data": {}})
+
+    async def chunks():
+        yield b"0123"
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        service = GoFileService("token", http_client=client)
+        with pytest.raises(GoFileError) as caught:
+            await service.upload_stream(chunks(), "big.bin", None, 10)
+    assert caught.value.status == "size-mismatch"

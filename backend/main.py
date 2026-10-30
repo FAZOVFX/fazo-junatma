@@ -45,20 +45,23 @@ class UploadSizeLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope.get("path") == "/api/files/upload" and scope.get("method") == "POST":
+        if (
+            scope["type"] == "http"
+            and str(scope.get("path") or "").startswith("/api/files/upload")
+            and scope.get("method") in {"POST", "PUT"}
+        ):
             headers = {key.decode("latin1").lower(): value.decode("latin1") for key, value in scope.get("headers", [])}
             raw_length = headers.get("content-length")
             settings = get_settings()
             max_bytes = int(settings.gofile_max_file_size_gb * (1024**3)) + (1024 * 1024)
-            if raw_length is None:
-                response = JSONResponse({"detail": "Fayl hajmi aniqlanmadi."}, status_code=411)
-                await response(scope, receive, send)
-                return
-            try:
-                length = int(raw_length)
-            except ValueError:
-                length = max_bytes + 1
-            if length > max_bytes:
+            if raw_length is not None:
+                try:
+                    length = int(raw_length)
+                except ValueError:
+                    length = max_bytes + 1
+            else:
+                length = 0
+            if raw_length is not None and length > max_bytes:
                 response = JSONResponse(
                     {"detail": "Fayl hajmi ruxsat etilgan chegaradan katta."},
                     status_code=413,
