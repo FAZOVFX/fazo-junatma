@@ -10,10 +10,12 @@ function formatSize(bytes) {
 function errorFrom(xhr) {
   let payload = {};
   try { payload = JSON.parse(xhr.responseText || "{}"); } catch (_error) { payload = {}; }
+  // Our own errors (GoFile failures included) come back as JSON with a detail, even on 502.
+  if (typeof payload.detail === "string") return new Error(payload.detail);
   if (xhr.status === 502 || xhr.status === 503 || !xhr.responseText || xhr.responseText.trim().startsWith("<")) {
-    return new Error("Server javob bermadi. Bir necha soniyadan keyin qayta urinib ko‘ring.");
+    return new Error(`Server javob bermadi (HTTP ${xhr.status}). Bir necha soniyadan keyin qayta urinib ko‘ring.`);
   }
-  return new Error(typeof payload.detail === "string" ? payload.detail : "Yuklashda xatolik");
+  return new Error(`Yuklashda xatolik (HTTP ${xhr.status})`);
 }
 
 async function startUpload(file) {
@@ -40,7 +42,7 @@ async function startUpload(file) {
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(typeof payload.detail === "string" ? payload.detail : "Yuklashda xatolik");
+    throw new Error(typeof payload.detail === "string" ? payload.detail : `Server javob bermadi (HTTP ${response.status}).`);
   }
   return payload.upload_url;
 }
